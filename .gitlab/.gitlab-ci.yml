@@ -1,0 +1,38 @@
+## DEFINE STAGES
+stages:
+  - debug
+  - scan
+
+## STEP 1: DEBUG
+debug:
+    stage: debug
+    script:
+        - echo "Initial Container Spin up, moving to Prisma Ruleset Check Stage."
+
+## STEP 2: SCAN IMAGE
+security_scan_free:
+  stage: scan
+  image: 
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  services:
+    - name: docker:dind
+      entrypoint: ["env", "-u", "DOCKER_HOST"]
+      command: ["dockerd-entrypoint.sh"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+    # See https://github.com/docker-library/docker/pull/166
+    DOCKER_TLS_CERTDIR: ""
+    IMAGE: nginx:latest
+  #tags:
+  #  - docker
+  script:
+    ## FULL SCAN W/ OUTPUT
+    - trivy image --format template --template "@templates/junit.tpl" -o junit-report.xml $IMAGE
+
+    ## FAIL IF CRITICALS FOUND
+    - trivy image --no-progress --exit-code 1 --severity CRITICAL $IMAGE
+  artifacts:
+    reports:
+      junit: junit-report.xml
